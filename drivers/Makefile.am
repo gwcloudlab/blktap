@@ -1,6 +1,7 @@
 
 AM_CFLAGS  = -Wall
 AM_CFLAGS += -Werror
+AM_CFLAGS += -lpthread
 
 AM_CPPFLAGS  = -D_GNU_SOURCE
 AM_CPPFLAGS += -I$(top_srcdir)/include
@@ -84,6 +85,7 @@ libtapdisk_la_SOURCES += block-lcache.c
 libtapdisk_la_SOURCES += block-llcache.c
 libtapdisk_la_SOURCES += block-nbd.c
 
+libtapdisk_la_SOURCES += adaptdr.c
 libtapdisk_la_SOURCES += block-adaptdr.c
 libtapdisk_la_SOURCES += block-asyncdr.c
 libtapdisk_la_SOURCES += block-syncdr.c

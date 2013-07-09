@@ -35,6 +35,8 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <linux/fs.h>
+
 
 // !TW! adding networking libs
 #include <sys/types.h>
@@ -97,9 +99,7 @@ void *adaptdr_thread_dispatch_writes(void *ptr);
 static int tdadaptdr_get_image_info(int fd, td_disk_info_t *info)
 {
 	int ret;
-	long size;
-	unsigned long total_size;
-	struct statvfs statBuf;
+	unsigned long long bytes;
 	struct stat stat;
 
 	ret = fstat(fd, &stat);
@@ -111,8 +111,12 @@ static int tdadaptdr_get_image_info(int fd, td_disk_info_t *info)
 	if (S_ISBLK(stat.st_mode)) {
 		/*Accessing block device directly*/
 		info->size = 0;
-		if (blk_getimagesize(fd, &info->size) != 0)
+		if (ioctl(fd,BLKGETSIZE64,&bytes)==0) {
+			info->size = bytes >> SECTOR_SHIFT;
+		} else if (ioctl(fd,BLKGETSIZE,&info->size)!=0) {
+			DPRINTF("ERR: BLKGETSIZE and BLKGETSIZE64 failed, couldn't stat image");
 			return -EINVAL;
+		}
 
 		DPRINTF("Image size: \n\tpre sector_shift  [%llu]\n\tpost "
 			"sector_shift [%llu]\n",
@@ -120,8 +124,18 @@ static int tdadaptdr_get_image_info(int fd, td_disk_info_t *info)
 			(long long unsigned)info->size);
 
 		/*Get the sector size*/
-		if (blk_getsectorsize(fd, &info->sector_size) != 0)
+#if defined(BLKSSZGET)
+		{
 			info->sector_size = DEFAULT_SECTOR_SIZE;
+			ioctl(fd, BLKSSZGET, &info->sector_size);
+			
+			if (info->sector_size != DEFAULT_SECTOR_SIZE)
+				DPRINTF("Note: sector size is %ld (not %d)\n",
+					info->sector_size, DEFAULT_SECTOR_SIZE);
+		}
+#else
+		info->sector_size = DEFAULT_SECTOR_SIZE;
+#endif
 
 	} else {
 		/*Local file? try fstat instead*/
@@ -133,7 +147,7 @@ static int tdadaptdr_get_image_info(int fd, td_disk_info_t *info)
 			(long long unsigned)info->size);
 	}
 
-	if (info->size == 0) {
+	if (info->size == 0) {		
 		info->size =((uint64_t) 16836057);
 		info->sector_size = DEFAULT_SECTOR_SIZE;
 	}
@@ -379,7 +393,6 @@ void tdadaptdr_queue_write(td_driver_t *driver, td_request_t treq)
 	struct adaptdr_request *adaptdr;
 	struct tdadaptdr_state *prv;
 	// data for sending request to backup !TW!
-	int rc;
 	struct req_info *rinfo;
 	char* dataptr;
 
@@ -487,7 +500,6 @@ struct tap_disk tapdisk_adaptdr = {
 /* !TW! Function used for worker thread that does all network sends */
 void *adaptdr_thread_dispatch_writes(void *stateptr) {
 	struct req_info *rinfo;
-	char* dataPtr;
 	int done=0;
 	int rc;
 	struct tdadaptdr_state *state = (struct tdadaptdr_state *)stateptr;

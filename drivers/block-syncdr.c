@@ -35,6 +35,7 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <linux/fs.h>
 
 // !TW! adding networking libs
 #include <sys/types.h>
@@ -42,7 +43,6 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#include "blk.h"
 #include "tapdisk.h"
 #include "tapdisk-driver.h"
 #include "tapdisk-interface.h"
@@ -85,9 +85,7 @@ struct tdsyncdr_state {
 static int tdsyncdr_get_image_info(int fd, td_disk_info_t *info)
 {
 	int ret;
-	long size;
-	unsigned long total_size;
-	struct statvfs statBuf;
+	unsigned long long bytes;
 	struct stat stat;
 
 	ret = fstat(fd, &stat);
@@ -99,8 +97,12 @@ static int tdsyncdr_get_image_info(int fd, td_disk_info_t *info)
 	if (S_ISBLK(stat.st_mode)) {
 		/*Accessing block device directly*/
 		info->size = 0;
-		if (blk_getimagesize(fd, &info->size) != 0)
+		if (ioctl(fd,BLKGETSIZE64,&bytes)==0) {
+			info->size = bytes >> SECTOR_SHIFT;
+		} else if (ioctl(fd,BLKGETSIZE,&info->size)!=0) {
+			DPRINTF("ERR: BLKGETSIZE and BLKGETSIZE64 failed, couldn't stat image");
 			return -EINVAL;
+		}
 
 		DPRINTF("Image size: \n\tpre sector_shift  [%llu]\n\tpost "
 			"sector_shift [%llu]\n",
@@ -108,8 +110,18 @@ static int tdsyncdr_get_image_info(int fd, td_disk_info_t *info)
 			(long long unsigned)info->size);
 
 		/*Get the sector size*/
-		if (blk_getsectorsize(fd, &info->sector_size) != 0)
+#if defined(BLKSSZGET)
+		{
 			info->sector_size = DEFAULT_SECTOR_SIZE;
+			ioctl(fd, BLKSSZGET, &info->sector_size);
+			
+			if (info->sector_size != DEFAULT_SECTOR_SIZE)
+				DPRINTF("Note: sector size is %ld (not %d)\n",
+					info->sector_size, DEFAULT_SECTOR_SIZE);
+		}
+#else
+		info->sector_size = DEFAULT_SECTOR_SIZE;
+#endif
 
 	} else {
 		/*Local file? try fstat instead*/
@@ -121,7 +133,7 @@ static int tdsyncdr_get_image_info(int fd, td_disk_info_t *info)
 			(long long unsigned)info->size);
 	}
 
-	if (info->size == 0) {
+	if (info->size == 0) {		
 		info->size =((uint64_t) 16836057);
 		info->sector_size = DEFAULT_SECTOR_SIZE;
 	}
@@ -353,9 +365,9 @@ void tdsyncdr_queue_write(td_driver_t *driver, td_request_t treq)
 	struct syncdr_request *syncdr;
 	struct tdsyncdr_state *prv;
 	// data for sending request to backup !TW!
-	int rc;
 	struct req_info *rinfo;
 	uint64_t ack;
+	int rc;
 
 	/* We need to make the req_info meta data and the data block
 	 * adjacement in memory, so allocate a byte array with plenty of
@@ -385,24 +397,6 @@ void tdsyncdr_queue_write(td_driver_t *driver, td_request_t treq)
 	rinfo->offset = offset;
 	rinfo->writeID = prv->pendingWrite++;
 
-	/*
-	DPRINTF("Req %llu   size: %d   offset: %llu",
-			(unsigned long long) rinfo.writeID, rinfo.size, (unsigned long long)rinfo.offset);
-	 */
-	if(0) // old code
-	{
-		rc = sendexact(prv->backupSocket, (char*)(&rinfo), sizeof(struct req_info));
-		if (rc < 0) {
-			DPRINTF("ERROR writing req info to socket");
-			return;
-		}
-
-		rc = sendexact(prv->backupSocket,treq.buf,size);
-		if (rc < 0) {
-			DPRINTF("ERROR writing buffer to socket");
-			return;
-		}
-	}
 	/* Sending meta + block data in one go */
 	memcpy(&req_info_and_data[sizeof(struct req_info)], treq.buf, size);
 

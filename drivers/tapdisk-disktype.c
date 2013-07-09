@@ -121,6 +121,21 @@ static const disk_info_t nbd_disk = {
 	"export to a NBD server",
 	0,
 };
+static const disk_info_t adaptdr_disk = {
+	"adaptdr",
+	"Pipelined Syncrhonous replicated disk",
+	0,
+};
+static const disk_info_t asyncdr_disk = {
+	"asyncdr",
+	"Asynchronous replicated disk",
+	0,
+};
+static const disk_info_t syncdr_disk = {
+	"syncdr",
+	"Syncrhonous replicated disk",
+	0,
+};
 
 const disk_info_t *tapdisk_disk_types[] = {
 	[DISK_TYPE_AIO]	= &aio_disk,
@@ -139,6 +154,9 @@ const disk_info_t *tapdisk_disk_types[] = {
 	[DISK_TYPE_LLPCACHE]    = &llpcache_disk,
 	[DISK_TYPE_LLECACHE]    = &llecache_disk,
 	[DISK_TYPE_NBD]         = &nbd_disk,
+	[DISK_TYPE_ADAPTDR]     = &adaptdr_disk,
+	[DISK_TYPE_ASYNCDR]     = &asyncdr_disk,
+	[DISK_TYPE_SYNCDR]     = &syncdr_disk,
 	0,
 };
 
@@ -164,6 +182,10 @@ extern struct tap_disk tapdisk_llecache;
 extern struct tap_disk tapdisk_valve;
 extern struct tap_disk tapdisk_nbd;
 
+extern struct tap_disk tapdisk_adaptdr;
+extern struct tap_disk tapdisk_asyncdr;
+extern struct tap_disk tapdisk_syncdr;
+
 const struct tap_disk *tapdisk_disk_drivers[] = {
 	[DISK_TYPE_AIO]         = &tapdisk_aio,
 #if 0
@@ -186,6 +208,9 @@ const struct tap_disk *tapdisk_disk_drivers[] = {
 	[DISK_TYPE_LLECACHE]    = &tapdisk_llecache,
 	[DISK_TYPE_VALVE]       = &tapdisk_valve,
 	[DISK_TYPE_NBD]         = &tapdisk_nbd,
+	[DISK_TYPE_ADAPTDR]     = &tapdisk_adaptdr,
+	[DISK_TYPE_ASYNCDR]     = &tapdisk_asyncdr,
+	[DISK_TYPE_SYNCDR]      = &tapdisk_syncdr,
 	0,
 };
 

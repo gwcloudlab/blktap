@@ -34,6 +34,9 @@
 #define DISK_TYPE_LLPCACHE    13
 #define DISK_TYPE_VALVE       14
 #define DISK_TYPE_NBD         15
+#define DISK_TYPE_ADAPTDR	  16
+#define DISK_TYPE_ASYNCDR	  17
+#define DISK_TYPE_SYNCDR	  18
 
 #define DISK_TYPE_NAME_MAX    32
 
